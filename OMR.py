@@ -1,5 +1,4 @@
 # USAGE
-# python test_grader.py --image images/test_01.png
 
 # import the necessary packages
 from imutils.perspective import four_point_transform
@@ -126,8 +125,6 @@ for image_file in glob.iglob('images/*.png'):
         questionCnts = contours.sort_contours(questionCnts,
                 method="top-to-bottom")[0]
 
-        # each question has 5 possible answers, to loop over the
-        # question in batches of 5
         teamnum = ""
         for (q, i) in enumerate(np.arange(0, 40, 10)):
                 cnts = contours.sort_contours(questionCnts[i:i + 10])[0]
