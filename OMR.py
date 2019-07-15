@@ -1,4 +1,5 @@
 # USAGE
+# python test_grader.py --image images/test_01.png
 
 # import the necessary packages
 from imutils.perspective import four_point_transform
@@ -11,8 +12,7 @@ import glob
 import shutil
 import openpyxl
 import os.path
-import qrtools
-from pyzbar.pyzbar import decode
+from pyzbar import pyzbar
 from os import path
 from openpyxl import Workbook
 
@@ -26,25 +26,26 @@ if path.exists("Results.xlsx"):
 else:
         wb = Workbook()
 
-for image_file in glob.iglob('images/*.png'):
+for image_file in glob.iglob('images/*.jpg'):
         matchNum = 0
         stationPos = ""
-        qrDecoder = cv2.QRCodeDetector()
         # load the image, convert it to grayscale, blur it
         # slightly, then find edges
         image = cv2.imread(image_file)
+        
         # Detect and decode the qrcode
-        data,bbox,rectifiedImage = qrDecoder.detectAndDecode(image)
-    
-        if len(data)>0:
-            split = data.split(':')
-            print(split)
+        barcodes = pyzbar.decode(image)
+        for barcode in barcodes:
+            (x, y, w, h) = barcode.rect
+            #cv2.rectangle(image, (x, y), (x + w, y + h), (0, 0, 255), 2)
+            barcodeData = barcode.data.decode("utf-8")
+            barcodeType = barcode.type
+            text = "{} ({})".format(barcodeData, barcodeType)
+            #cv2.putText(image, text, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+            print("[INFO] found {} QR code {}".format(barcodeType, barcodeData))
+            split = barcodeData.split(':')
             matchNum = int(split[0])
-            display(image, bbox)
-            rectifiedImage = np.uint8(rectifiedImage);              
-        else:
-            split = 'NA'
-            print("QR Code not detected")
+
 
         if split[1] is '1':
             stationPos = 'Red 1'
@@ -61,7 +62,7 @@ for image_file in glob.iglob('images/*.png'):
         else:
             stationPos = split[1]
             
-        cv2.rectangle(image,(565,30),(685,150),(255,255,255),-1)
+        cv2.rectangle(image,(635,40),(765,165),(255,255,255),-1)
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         blurred = cv2.GaussianBlur(gray, (5, 5), 0)
 
@@ -125,6 +126,7 @@ for image_file in glob.iglob('images/*.png'):
         questionCnts = contours.sort_contours(questionCnts,
                 method="top-to-bottom")[0]
 
+        # Get team number
         teamnum = ""
         for (q, i) in enumerate(np.arange(0, 40, 10)):
                 cnts = contours.sort_contours(questionCnts[i:i + 10])[0]
@@ -149,8 +151,9 @@ for image_file in glob.iglob('images/*.png'):
         else:
                 ws = wb.get_sheet_by_name(str(int(teamnum)))
                 
-        for (q, i) in enumerate(np.arange(40, 45, 5)):
-                cnts = contours.sort_contours(questionCnts[i:i + 5])[0]
+        # Get starting position
+        for (q, i) in enumerate(np.arange(40, 44, 4)):
+                cnts = contours.sort_contours(questionCnts[i:i + 4])[0]
                 bubbled = None
 
                 for (j, c) in enumerate(cnts):
@@ -170,14 +173,13 @@ for image_file in glob.iglob('images/*.png'):
                 elif bubbled[1] is 2:
                     startPos = 'Right'
                 elif bubbled[1] is 3:
-                    startPos = 'GZ'
-                elif bubbled[1] is 4:
                     startPos = 'No Show'
                 else:
                     startPos = bubbled[1]
 
-        for (q, i) in enumerate(np.arange(45, 46, 1)):
-                cnts = contours.sort_contours(questionCnts[i:i + 1])[0]
+        # Get move bonus
+        for (q, i) in enumerate(np.arange(44, 46, 2)):
+                cnts = contours.sort_contours(questionCnts[i:i + 2])[0]
                 bubbled = None
 
                 for (j, c) in enumerate(cnts):
@@ -188,13 +190,16 @@ for image_file in glob.iglob('images/*.png'):
                         total = cv2.countNonZero(mask)
 
                         if bubbled is None or total > bubbled[0]:
-                                bubbled = (total, 'Yes')
+                                bubbled = (total, j)
                                 
                         if bubbled[0] < 200 and total < 200:
                                 bubbled = (total, 'NA')
                                 
-                autoMove = bubbled[1]                
-
+                if bubbled[1] is 0:             
+                    autoMove = 'Level 1'
+                elif bubbled[1] is 1:
+                    autoMove = 'Level 2'
+        
         for (q, i) in enumerate(np.arange(46, 55, 3)):
                 cnts = contours.sort_contours(questionCnts[i:i + 3])[0]
                 bubbled = None
